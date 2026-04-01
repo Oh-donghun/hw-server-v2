@@ -1,0 +1,29 @@
+﻿name: Deploy to Cloud Run
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+
+      - id: auth
+        uses: google-github-actions/auth@v1
+        with:
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - uses: google-github-actions/deploy-cloudrun@v1
+        with:
+          service: hw-server-v2
+          region: asia-northeast3
+          source: .
+          env_vars: |
+            TOSS_SECRET_KEY=${{ secrets.TOSS_SECRET_KEY }}
+            SOLAPI_API_KEY=${{ secrets.SOLAPI_API_KEY }}
+            SOLAPI_API_SECRET=${{ secrets.SOLAPI_API_SECRET }}
+            SOLAPI_PFID=${{ secrets.SOLAPI_PFID }}
+            SOLAPI_SENDER=${{ secrets.SOLAPI_SENDER }}
+            CLAUDE_API_KEY=${{ secrets.CLAUDE_API_KEY }}
