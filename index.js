@@ -17,8 +17,7 @@ const solapi = new SolapiMessageService(process.env.SOLAPI_API_KEY, process.env.
 const SOLAPI_PFID = process.env.SOLAPI_PFID;
 const SOLAPI_SENDER = process.env.SOLAPI_SENDER;
 
-const serviceAccount = require('./serviceAccount.json');
-admin.initializeApp({ credential: admin.credential.cert(serviceAccount) });
+admin.initializeApp();
 const db = admin.firestore();
 const FieldValue = admin.firestore.FieldValue;
 const app = express();

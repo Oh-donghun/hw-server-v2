@@ -11,13 +11,12 @@ jobs:
         uses: google-github-actions/auth@v1
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
-      - name: Write serviceAccount.json
-        run: echo '${{ secrets.GCP_SERVICE_ACCOUNT_B64 }}' | base64 -d > serviceAccount.json
       - uses: google-github-actions/deploy-cloudrun@v1
         with:
           service: hw-server-v2
           region: asia-northeast3
           source: .
+          service_account: firebase-adminsdk-fbsvc@naread-pdf.iam.gserviceaccount.com
           env_vars: |
             TOSS_SECRET_KEY=${{ secrets.TOSS_SECRET_KEY }}
             SOLAPI_API_KEY=${{ secrets.SOLAPI_API_KEY }}
