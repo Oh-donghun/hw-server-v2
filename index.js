@@ -29,6 +29,37 @@ app.use(express.json());
 const jaemulRouter = require('./routes/jaemul');
 app.use(jaemulRouter);
 
+
+// ── 현재 날짜 + 간지 자동 계산 ──
+function getCurrentDateContext() {
+  const now = new Date();
+  const kst = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Seoul' }));
+  const year = kst.getFullYear();
+  const month = kst.getMonth() + 1;
+  const day = kst.getDate();
+  const gan = ['경','신','임','계','갑','을','병','정','무','기'];
+  const ganH = ['庚','辛','壬','癸','甲','乙','丙','丁','戊','己'];
+  const ji = ['신','유','술','해','자','축','인','묘','진','사','오','미'];
+  const jiH = ['申','酉','戌','亥','子','丑','寅','卯','辰','巳','午','未'];
+  const animals = ['원숭이','닭','개','돼지','쥐','소','호랑이','토끼','용','뱀','말','양'];
+  const gI = year % 10, jI = year % 12;
+  const curGanji = gan[gI]+ji[jI], curGanjiH = ganH[gI]+jiH[jI], curAnimal = animals[jI];
+  const p1 = year-1, p2 = year-2, n1 = year+1;
+  const p1G = gan[p1%10]+ji[p1%12], p1H = ganH[p1%10]+jiH[p1%12];
+  const p2G = gan[p2%10]+ji[p2%12], p2H = ganH[p2%10]+jiH[p2%12];
+  const n1G = gan[n1%10]+ji[n1%12], n1H = ganH[n1%10]+jiH[n1%12];
+  return '오늘은 '+year+'년 '+month+'월 '+day+'일이다.\n'
+    +'올해는 '+year+'년 '+curGanji+'('+curGanjiH+')년('+curAnimal+'의 해)이다.\n'
+    +'- '+p2+'년은 '+p2G+'('+p2H+')년으로 이미 지나간 해다.\n'
+    +'- '+p1+'년은 '+p1G+'('+p1H+')년으로 이미 지나간 해다.\n'
+    +'- '+year+'년은 '+curGanji+'('+curGanjiH+')년으로 현재 진행 중인 해다.\n'
+    +'- '+(n1)+'년은 '+n1G+'('+n1H+')년이다.\n'
+    +'- 고객이 올해라고 하면 반드시 '+year+'년 '+curGanji+'년을 기준으로 답하라.\n'
+    +'- 이사, 투자, 이직, 연애 등 시기 관련 답변은 '+year+'년 이후만 답하라.\n'
+    +'- 이미 지나간 해를 추천하지 마라.\n'
+    +'- 과거 운세는 과거형으로 서술하라.';
+}
+
 // gender 정규화: male/female/M/F/m/f/남/여 -> 'male' 또는 'female'
 function normalizeGender(raw) {
   if (!raw || raw === '') return 'male';
@@ -99,6 +130,17 @@ app.post('/order', async (req, res) => {
     const prod = PRODUCTS[product];
     if (!prod) return res.status(400).json({ error: 'invalid product' });
 const isUpgrade = req.body.upgradeFrom ? true : false;
+    // 업그레이드 시 gender가 비어있으면 이전 주문에서 가져오기
+    let resolvedGender = req.body.gender || '';
+    if (isUpgrade && !resolvedGender) {
+      try {
+        const prevOrder = await db.collection('hw-orders').doc(req.body.upgradeFrom).get();
+        if (prevOrder.exists) {
+          resolvedGender = prevOrder.data().user?.gender || '';
+          console.log('[order] 업그레이드 gender 상속:', req.body.upgradeFrom, '->', resolvedGender);
+        }
+      } catch(e) { console.error('prev order gender lookup failed:', e.message); }
+    }
     let finalPrice = prod.price;
     if (isUpgrade) {
       const fromProduct = req.body.fromProduct || '';
@@ -108,7 +150,7 @@ const isUpgrade = req.body.upgradeFrom ? true : false;
     await db.collection('hw-orders').doc(orderId).set({
       orderId, product, productName: prod.name, price: finalPrice, payMethod: 'toss',
       isUpgrade, upgradeFrom: req.body.upgradeFrom || '',
-      user: { name, phone, gender: normalizeGender(req.body.gender), birthDate: birthDate || '', calendar: req.body.calendarType || req.body.calType || 'solar', birthTime: birthTime || '' },
+      user: { name, phone, gender: normalizeGender(resolvedGender), birthDate: birthDate || '', calendar: req.body.calendarType || req.body.calType || 'solar', birthTime: birthTime || '' },
       question: question || '', question2: req.body.question2 || '', job: req.body.job || '', marriage: req.body.marriage || '미입력', hasChild: req.body.hasChild || '없음', interest: req.body.interest || '전체', status: 'pending', paymentStatus: 'waiting', questionsLeft: prod.questions,
       nusuCard: req.body.nusuCard || null,
       createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
@@ -262,7 +304,9 @@ app.post('/ask', async (req, res) => {
     const claudeRes = await axios.post('https://api.anthropic.com/v1/messages', {
       model: 'claude-sonnet-4-20250514',
       max_tokens: 800,
-      system: `너는 호왕당 할머니다. 50년 경력의 역술가이며, 사주 원국 데이터에 근거하여 답변한다.
+      system: `${getCurrentDateContext()}
+
+너는 호왕당 할머니다. 50년 경력의 역술가이며, 사주 원국 데이터에 근거하여 답변한다.
 
 규칙:
 1. 반말 명령형으로 말한다 ("~해라", "~이다", "~마라")
@@ -1205,7 +1249,11 @@ const allSipsin = [];
 
    const currentYear = new Date().getFullYear();
 
+    const dateContext = getCurrentDateContext();
     const systemPrompt = `너는 '호왕당 할머니'다. 70대 무당 할머니로, 사주를 50년 넘게 봐왔다.
+
+## 현재 날짜 정보
+${dateContext}
 
 ## 말투 규칙
 - 반말로 말한다. "~해라", "~이다", "~하지 마라"
