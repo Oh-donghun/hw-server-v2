@@ -132,10 +132,21 @@ function calcHabitKey(elementGauge) {
   return 'balanced';
 }
 
+// ── 그릇 등급 (vesselSize → 6단계) ──
+function calcVesselGrade(vesselSize) {
+  if (vesselSize >= 80) return { grade: 'grade_1', vesselLabel: '가마솥' };
+  if (vesselSize >= 68) return { grade: 'grade_2', vesselLabel: '큰 항아리' };
+  if (vesselSize >= 56) return { grade: 'grade_3', vesselLabel: '항아리' };
+  if (vesselSize >= 44) return { grade: 'grade_4', vesselLabel: '냄비' };
+  if (vesselSize >= 30) return { grade: 'grade_5', vesselLabel: '주전자' };
+  return { grade: 'grade_6', vesselLabel: '찻잔' };
+}
+
 module.exports = {
   calcVesselKey: calcVesselKey,
   calcWealthGrade: calcWealthGrade,
   calcVesselSize: calcVesselSize,
+  calcVesselGrade: calcVesselGrade,    // ← 추가
   calcChannelKey: calcChannelKey,
   calcChannelGauge: calcChannelGauge,
   calcLeakInfo: calcLeakInfo,

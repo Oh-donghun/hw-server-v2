@@ -3,7 +3,7 @@ const router = express.Router();
 const { db, FieldValue } = require('../utils/firestore');
 const { normalizeGender } = require('../utils/gender');
 const { parseBirth, analyze } = require('../engines/sajuEngine');
-const { calcVesselKey, calcWealthGrade, calcVesselSize, calcChannelKey, calcChannelGauge, calcLeakInfo, calcHabitKey } = require('../engines/scoreEngine');
+const { calcVesselKey, calcWealthGrade, calcVesselSize, calcVesselGrade, calcChannelKey, calcChannelGauge, calcLeakInfo, calcHabitKey } = require('../engines/scoreEngine');
 const { appendTail } = require('../engines/textEngine');
 const jaemulData = require('../jaemulData');
 const ageData = require('../ageData');
@@ -68,7 +68,16 @@ router.post('/api/jaemul', async (req, res) => {
     const lifeKey = lifeData.getLifeKey(order.marriage || '미혼', order.hasChild || '없음');
 
     // ── 점수 계산 (엔진) ──
-    const vesselKey = calcVesselKey(saju.counts);
+    const vesselKeyRaw = calcVesselKey(saju.counts);
+const vesselKeyFallback = {
+  jeong_moderate: 'jeong_strong',
+  pyeon_moderate: 'pyeon_strong',
+  skill_potential: 'skill',
+  leak_mild: 'leak',
+  official_wealth: 'both_strong',
+  knowledge_wealth: 'both_weak'
+};
+const vesselKey = vesselKeyFallback[vesselKeyRaw] || vesselKeyRaw;
     const { wealthScore, wealthGrade } = calcWealthGrade(saju.counts, saju.strength);
     const channelKey = calcChannelKey(saju.counts);
     const channelGauge = calcChannelGauge(saju.counts, saju.dayElement);
@@ -140,7 +149,7 @@ router.post('/api/jaemul', async (req, res) => {
 
     // ── 시각화 데이터 ──
     const vesselSize = calcVesselSize(saju.counts, saju.strength, saju.dayElement);
-    const vesselLabel = vesselSize >= 80 ? '\ud070 \uc19f' : vesselSize >= 60 ? '\ud56d\uc544\ub9ac' : vesselSize >= 40 ? '\uc0ac\ubc1c' : '\ucc3b\uc794';
+    const { grade: vesselGrade, vesselLabel } = calcVesselGrade(vesselSize);
 
 
     const investRadarMap = {
@@ -173,14 +182,14 @@ router.post('/api/jaemul', async (req, res) => {
     };
     const checklist = habitChecklist[habitKey] || habitChecklist['balanced'];
 
-    const hoTongIntensityMap = { leak: 5, both_weak: 4, pyeon_strong: 4, skill: 3, jeong_strong: 3, both_strong: 3 };
-    const hoTongIntensity = hoTongIntensityMap[vesselKey] || 3;
+    const hoTongIntensityMap = { grade_6: 5, grade_5: 4, grade_4: 4, grade_3: 3, grade_2: 3, grade_1: 3 };
+    const hoTongIntensity = hoTongIntensityMap[vesselGrade] || 3;
 
     // ── 텍스트 조립 ──
     const overviewKey = saju.dayGan + '_' + saju.strength;
     let overview = jaemulData.overview[overviewKey] || jaemulData.overview['甲_strong'];
 
-    let moneyVessel = jaemulData.moneyVessel[vesselKey] || '';
+let moneyVessel = jaemulData.moneyVessel[vesselKey] || '';
     let moneyChannel = jaemulData.moneyChannel[channelKey] || '';
     let leakPattern = jaemulData.leakPattern[leakKey] || jaemulData.leakPattern['unconscious'] || '';
     let investType = jaemulData.investType[saju.dayElement] || jaemulData.investType['wood'];
@@ -213,15 +222,15 @@ router.post('/api/jaemul', async (req, res) => {
     }
 
     // ── 2. moneyVessel 꼬리 (life + gender + age + job) ──
-    moneyVessel = appendTail(moneyVessel, jaemulData.vesselLife, vesselKey + '_' + lifeKey);
+    moneyVessel = appendTail(moneyVessel, jaemulData.vesselLife, vesselGrade + '_' + lifeKey);
     if (jaemulData.vesselGender) {
-      moneyVessel = appendTail(moneyVessel, jaemulData.vesselGender, vesselKey + '_' + genderKey);
+      moneyVessel = appendTail(moneyVessel, jaemulData.vesselGender, vesselGrade + '_' + genderKey);
     }
     if (jaemulData.vesselAge) {
-      moneyVessel = appendTail(moneyVessel, jaemulData.vesselAge, vesselKey + '_' + mappedAge);
+      moneyVessel = appendTail(moneyVessel, jaemulData.vesselAge, vesselGrade + '_' + mappedAge);
     }
     if (jaemulData.vesselJob) {
-      moneyVessel = appendTail(moneyVessel, jaemulData.vesselJob, vesselKey + '_' + jobKor);
+     moneyVessel = appendTail(moneyVessel, jaemulData.vesselJob, vesselGrade + '_' + jobKor);
     }
 
     // ── 3. moneyChannel 꼬리 (gender + age + job + life) ──
@@ -287,15 +296,15 @@ router.post('/api/jaemul', async (req, res) => {
     }
 
     // ── 8. wealthHoTong 꼬리 (life + gender + age + job) ──
-    wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongLife, vesselKey + '_' + lifeKey);
+    wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongLife, vesselGrade + '_' + lifeKey);
     if (jaemulData.hoTongGender) {
-      wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongGender, vesselKey + '_' + genderKey);
+      wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongGender, vesselGrade + '_' + genderKey);
     }
     if (jaemulData.hoTongAge) {
-      wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongAge, vesselKey + '_' + mappedAge);
+      wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongAge, vesselGrade + '_' + mappedAge);
     }
     if (jaemulData.hoTongJob) {
-      wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongJob, vesselKey + '_' + jobKor);
+      wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongJob, vesselGrade + '_' + jobKor);
     }
 
     // ── 초견 결과 참조 ──
@@ -317,7 +326,7 @@ router.post('/api/jaemul', async (req, res) => {
       fourPillarsHangul: saju.fourPillarsHangul,
       elementGauge: saju.elementGauge,
       wealthGrade, wealthScore,
-      vesselKey, vesselSize, vesselLabel,
+      vesselKey, vesselKeyRaw, vesselGrade, vesselSize, vesselLabel,
       channelKey, channelGauge,
       leakKey, leakLevel, leakLabel,
       investRadar, jobScore, hoTongIntensity, checklist,

@@ -29,6 +29,9 @@ app.use(express.json());
 const jaemulRouter = require('./routes/jaemul');
 app.use(jaemulRouter);
 
+const gimyeongRouter = require('./routes/gimyeong');  // ← 추가
+app.use(gimyeongRouter);                               // ← 추가
+
 
 // ── 현재 날짜 + 간지 자동 계산 ──
 function getCurrentDateContext() {
