@@ -189,7 +189,7 @@ const vesselKey = vesselKeyFallback[vesselKeyRaw] || vesselKeyRaw;
     const overviewKey = saju.dayGan + '_' + saju.strength;
     let overview = jaemulData.overview[overviewKey] || jaemulData.overview['甲_strong'];
 
-let moneyVessel = jaemulData.moneyVessel[vesselKey] || '';
+let moneyVessel = (jaemulData.moneyVessel[vesselKey] || '').replace(/\{vesselLabel\}/g, vesselLabel);
     let moneyChannel = jaemulData.moneyChannel[channelKey] || '';
     let leakPattern = jaemulData.leakPattern[leakKey] || jaemulData.leakPattern['unconscious'] || '';
     let investType = jaemulData.investType[saju.dayElement] || jaemulData.investType['wood'];
@@ -197,7 +197,7 @@ let moneyVessel = jaemulData.moneyVessel[vesselKey] || '';
     const monthlyFortune = jaemulData.monthlyFortune[saju.dayGan] || jaemulData.monthlyFortune['甲'];
     const threeYear = jaemulData.threeYearFlow[saju.dayGan] || jaemulData.threeYearFlow['甲'];
     let moneyHabit = jaemulData.moneyHabit[habitKey] || '';
-    let wealthHoTong = jaemulData.wealthHoTong[vesselKey] || '';
+    let wealthHoTong = (jaemulData.wealthHoTong[vesselKey] || '').replace(/\{vesselLabel\}/g, vesselLabel);
 
     // ── ageGroup 매핑 (공통) ──
     const ageMap = { age_40_44: 'age_40_49', age_45_49: 'age_40_49' };
@@ -222,16 +222,19 @@ let moneyVessel = jaemulData.moneyVessel[vesselKey] || '';
     }
 
     // ── 2. moneyVessel 꼬리 (life + gender + age + job) ──
-    moneyVessel = appendTail(moneyVessel, jaemulData.vesselLife, vesselGrade + '_' + lifeKey);
+    moneyVessel = appendTail(moneyVessel, jaemulData.vesselLife, vesselKey + '_' + lifeKey);
     if (jaemulData.vesselGender) {
-      moneyVessel = appendTail(moneyVessel, jaemulData.vesselGender, vesselGrade + '_' + genderKey);
+      moneyVessel = appendTail(moneyVessel, jaemulData.vesselGender, vesselKey + '_' + genderKey);
     }
     if (jaemulData.vesselAge) {
-      moneyVessel = appendTail(moneyVessel, jaemulData.vesselAge, vesselGrade + '_' + mappedAge);
+      moneyVessel = appendTail(moneyVessel, jaemulData.vesselAge, vesselKey + '_' + mappedAge);
     }
     if (jaemulData.vesselJob) {
-     moneyVessel = appendTail(moneyVessel, jaemulData.vesselJob, vesselGrade + '_' + jobKor);
+     moneyVessel = appendTail(moneyVessel, jaemulData.vesselJob, vesselKey + '_' + jobKor);
     }
+   moneyVessel = moneyVessel.replace(/\{vesselLabel\}/g, vesselLabel);
+
+
 
     // ── 3. moneyChannel 꼬리 (gender + age + job + life) ──
     if (jaemulData.channelGender) {
@@ -296,16 +299,18 @@ let moneyVessel = jaemulData.moneyVessel[vesselKey] || '';
     }
 
     // ── 8. wealthHoTong 꼬리 (life + gender + age + job) ──
-    wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongLife, vesselGrade + '_' + lifeKey);
+    wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongLife, vesselKey + '_' + lifeKey);
     if (jaemulData.hoTongGender) {
-      wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongGender, vesselGrade + '_' + genderKey);
+      wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongGender, vesselKey + '_' + genderKey);
     }
     if (jaemulData.hoTongAge) {
-      wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongAge, vesselGrade + '_' + mappedAge);
+      wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongAge, vesselKey + '_' + mappedAge);
     }
     if (jaemulData.hoTongJob) {
-      wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongJob, vesselGrade + '_' + jobKor);
+      wealthHoTong = appendTail(wealthHoTong, jaemulData.hoTongJob, vesselKey + '_' + jobKor);
     }
+    wealthHoTong = wealthHoTong.replace(/\{vesselLabel\}/g, vesselLabel);
+
 
     // ── 초견 결과 참조 ──
     let chogyeonRef = null;
