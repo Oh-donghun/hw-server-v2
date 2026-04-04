@@ -32,7 +32,7 @@ router.post('/api/v2/gimyeong-card', async (req, res) => {
       solarYear = sol.year; solarMonth = sol.month; solarDay = sol.day;
     }
 
-    // ── 사주 API 호출 (누수패와 동일) ──
+    // ── 사주 API 호출 ──
     const sajuRes = await axios.post('https://naread-saju-1075269376260.asia-northeast3.run.app/saju', {
       name: name || 'gimyeong',
       year: solarYear, month: solarMonth, day: solarDay,
@@ -47,7 +47,7 @@ router.post('/api/v2/gimyeong-card', async (req, res) => {
     const ohengMap = { '목': 'wood', '화': 'fire', '토': 'earth', '금': 'metal', '수': 'water' };
     const dayElement = ohengMap[dayOheng] || 'wood';
 
-    // ── 오행 비율 (누수패와 동일 로직) ──
+    // ── 오행 비율 ──
     const oh = saju.oheng;
     const total = (oh['목']||0) + (oh['화']||0) + (oh['토']||0) + (oh['금']||0) + (oh['수']||0);
     const dayPct = total ? Math.round(((oh[dayOheng]||0) / total) * 100) : 0;
@@ -60,7 +60,7 @@ router.post('/api/v2/gimyeong-card', async (req, res) => {
       water: total ? Math.round(((oh['수']||0)/total)*100) : 0
     };
 
-    // ── 십신 분석 (재물풀이와 동일 로직) ──
+    // ── 십신 분석 ──
     const sipseong = saju.sipseong || {};
     const allSipsin = [];
     ['year','month','day','hour'].forEach(p => {
@@ -78,7 +78,7 @@ router.post('/api/v2/gimyeong-card', async (req, res) => {
     const gwansungCount = allSipsin.filter(s => s && (s.includes('정관') || s.includes('편관'))).length;
     const insungCount = allSipsin.filter(s => s && (s.includes('정인') || s.includes('편인'))).length;
 
-    // ── scoreEngine 호출 (재물풀이와 동일한 엔진) ──
+    // ── scoreEngine 호출 ──
     const counts = {
       jae: jaeCount,
       jeongJae: jeongJaeCount,
@@ -130,6 +130,55 @@ router.post('/api/v2/gimyeong-card', async (req, res) => {
       grade_6: '하위 10%'
     };
 
+    // ── 사주 근거 텍스트 동적 조합 ──
+    const ganNameMap = {
+      '甲': '갑목(甲木)', '乙': '을목(乙木)', '丙': '병화(丙火)', '丁': '정화(丁火)',
+      '戊': '무토(戊土)', '己': '기토(己土)', '庚': '경금(庚金)', '辛': '신금(辛金)',
+      '壬': '임수(壬水)', '癸': '계수(癸水)'
+    };
+    const strengthKor = strength === 'strong' ? '신강' : '신약';
+    const ganDesc = ganNameMap[dayGan] || dayGan;
+
+    let jaeSummary = '';
+    if (jeongJaeCount > 0 && pyeonJaeCount > 0) {
+      jaeSummary = `정재 ${jeongJaeCount}개, 편재 ${pyeonJaeCount}개로 안정 수입과 변동 수입이 공존한다.`;
+    } else if (jeongJaeCount > 0) {
+      jaeSummary = `정재가 ${jeongJaeCount}개로 안정적인 수입 구조를 갖고 있다.`;
+    } else if (pyeonJaeCount > 0) {
+      jaeSummary = `편재가 ${pyeonJaeCount}개로 큰 돈이 한 번에 들어오는 구조다.`;
+    } else {
+      jaeSummary = '사주에 재성이 없어 돈과의 인연을 직접 만들어야 한다.';
+    }
+
+    const vesselKeyFallbackGm = {
+      jeong_moderate: 'jeong_strong',
+      pyeon_moderate: 'pyeon_strong',
+      skill_potential: 'skill',
+      leak_mild: 'leak',
+      official_wealth: 'both_strong',
+      knowledge_wealth: 'both_weak'
+    };
+    const mappedVesselKey = vesselKeyFallbackGm[vesselKey] || vesselKey;
+
+    const vesselReasonMap = {
+      both_strong: `정재와 편재가 모두 자리 잡고 있어, 월급 같은 고정 수입과 투자·부업 같은 유동 수입을 동시에 담을 수 있는 구조다. ${strengthKor} 사주라 그릇을 채울 체력도 충분하다.`,
+      jeong_strong: `정재가 단단하게 자리 잡고 있어 꾸준히 쌓이는 돈에 강하다. 한 번에 크게 벌기보다 시간이 지날수록 두둑해지는 구조다. ${strengthKor} 사주가 이 안정성을 뒷받침한다.`,
+      pyeon_strong: `편재가 강해서 돈이 올 때 크게 온다. 사업 수익, 투자 수익처럼 한 방에 들어오는 돈에 인연이 있다. 다만 ${strengthKor} 사주라 들어온 돈을 지키는 힘${strength === 'strong' ? '은 있다. 뚜껑만 잘 덮으면 된다.' : '이 약하다. 반드시 시스템으로 잡아야 한다.'}`,
+      skill: `식상이 재성을 살리는 구조다. 네 손에서 나오는 결과물이 곧 돈이 된다. ${strengthKor} 사주에 식상 ${siksangCount}개가 재성을 밀어주고 있어, 재주를 상품화하면 그릇이 빠르게 찬다.`,
+      leak: `비겁이 ${bigyeopCount}개로 강해서 돈이 들어와도 주변으로 빠진다. 재성이 ${jaeCount > 0 ? jaeCount + '개 있어 벌 수는 있지만' : '없어 벌기도 어려운데'}, 새는 속도가 채우는 속도를 이긴다. ${strengthKor} 사주라 에너지는 ${strength === 'strong' ? '넘치는데 그 에너지가 남을 위해 쓰이고 있다.' : '부족한데 남까지 챙기느라 내 몫이 없다.'}`,
+      both_weak: `사주에 재성이 약해서 돈이 저절로 굴러들어오는 팔자는 아니다. 하지만 ${strengthKor} 사주라 ${strength === 'strong' ? '체력은 있으니 전문성으로 그릇을 키울 수 있다.' : '에너지도 부족하니 한 분야에 집중해서 효율을 높여야 한다.'} ${insungCount >= 2 ? '인성이 ' + insungCount + '개로 학습 능력이 뛰어나니, 공부로 몸값을 올리는 게 가장 빠른 길이다.' : gwansungCount >= 2 ? '관성이 ' + gwansungCount + '개로 조직 안에서 인정받는 구조다. 승진이 곧 재물운이다.' : '식상이나 관성을 활용해 돈의 통로를 직접 만들어야 한다.'}`
+    };
+    const vesselReason = vesselReasonMap[mappedVesselKey] || vesselReasonMap['both_weak'];
+
+    const sipsinSummary = [];
+    if (jeongJaeCount > 0) sipsinSummary.push(`정재 ${jeongJaeCount}`);
+    if (pyeonJaeCount > 0) sipsinSummary.push(`편재 ${pyeonJaeCount}`);
+    if (bigyeopCount > 0) sipsinSummary.push(`비겁 ${bigyeopCount}`);
+    if (siksangCount > 0) sipsinSummary.push(`식상 ${siksangCount}`);
+    if (gwansungCount > 0) sipsinSummary.push(`관성 ${gwansungCount}`);
+    if (insungCount > 0) sipsinSummary.push(`인성 ${insungCount}`);
+
+    // ── 응답 ──
     res.json({
       success: true,
       card: {
@@ -138,10 +187,13 @@ router.post('/api/v2/gimyeong-card', async (req, res) => {
         dayGan: dayGan,
         dayGanOheng: dayElement,
         strength: strength,
+        strengthKor: strengthKor,
+        ganDesc: ganDesc,
         fourPillars: fourPillars,
         fourPillarsHangul: fourPillarsHangul,
         elementGauge: elementGauge,
         vesselKey: vesselKey,
+        mappedVesselKey: mappedVesselKey,
         vesselSize: vesselSize,
         vesselGrade: vesselGrade,
         vesselLabel: vesselLabel,
@@ -151,7 +203,10 @@ router.post('/api/v2/gimyeong-card', async (req, res) => {
         channelGauge: channelGauge,
         gradeDesc: gradeDesc[vesselGrade] || '',
         gradePercentLabel: gradePercentLabel[vesselGrade] || '',
-        cardText: gradeDesc[vesselGrade] || ''
+        cardText: gradeDesc[vesselGrade] || '',
+        jaeSummary: jaeSummary,
+        vesselReason: vesselReason,
+        sipsinSummary: sipsinSummary.join(' · ')
       }
     });
 
