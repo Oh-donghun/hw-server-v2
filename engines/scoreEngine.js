@@ -41,19 +41,24 @@ function calcWealthGrade(counts, strength) {
 function calcVesselSize(counts, strength, dayElement) {
   var jae = counts.jae, jeongJae = counts.jeongJae, pyeonJae = counts.pyeonJae;
   var bigyeop = counts.bigyeop, siksang = counts.siksang, gwansung = counts.gwansung, insung = counts.insung;
-  var size = 35;
-  size += jae * 8;
+  var size = 28;
+  size += jae * 9;
   if (siksang >= 1 && jae >= 1) size += 5;
   if (jeongJae >= 1 && pyeonJae >= 1) size += 4;
   if (gwansung >= 1 && jae >= 1) size += 2;
-  if (strength === 'strong') size += 3;
-  if (bigyeop >= 3) size -= 8;
+  if (strength === 'strong' && jae >= 2) size += 4;
+  if (strength === 'weak') size -= 3;
+  if (bigyeop >= 4) size -= 12;
+  else if (bigyeop >= 3) size -= 8;
   else if (bigyeop >= 2) size -= 4;
-  if (insung >= 4 && jae === 0) size -= 5;
-  if (jae === 0) size -= 5;
+  if (insung >= 4 && jae === 0) size -= 8;
+  else if (insung >= 3 && jae <= 1) size -= 4;
+  if (jae === 0) size -= 10;
+  else if (jae === 1) size -= 3;
+  if (gwansung >= 4 && jae <= 1) size -= 4;
   var elBonus = { wood: 2, fire: 0, earth: 4, metal: 3, water: 1 };
   size += elBonus[dayElement] || 0;
-  return Math.max(15, Math.min(95, size));
+  return Math.max(12, Math.min(95, size));
 }
 
 function calcChannelKey(counts) {
