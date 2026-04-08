@@ -1674,6 +1674,7 @@ app.get('/admin/dashboard', async (req, res) => {
     let totalHowangpae = 0;
     let totalSuhopae = 0;
     let totalNusupae = 0;
+let totalGimyeongpae = 0;
     const pageVisits = {};
 
     analyticsSnap.forEach(doc => {
@@ -1685,11 +1686,13 @@ app.get('/admin/dashboard', async (req, res) => {
       const dayHowangpae = cards.howangpae || 0;
       const daySuhopae = cards.suhopae || 0;
       const dayNusupae = cards.nusupae || 0;
+    const dayGimyeongpae = cards.gimyeongpae || 0;
 
       totalVisits += dayTotal;
       totalHowangpae += dayHowangpae;
       totalSuhopae += daySuhopae;
       totalNusupae += dayNusupae;
+      totalGimyeongpae += dayGimyeongpae;
 
       Object.entries(visits).forEach(([page, count]) => {
         pageVisits[page] = (pageVisits[page] || 0) + count;
@@ -1701,7 +1704,8 @@ app.get('/admin/dashboard', async (req, res) => {
         howangpae: dayHowangpae,
         suhopae: daySuhopae,
         nusupae: dayNusupae,
-        cards: dayHowangpae + daySuhopae + dayNusupae,
+        gimyeongpae: dayGimyeongpae,
+        cards: dayHowangpae + daySuhopae + dayNusupae + dayGimyeongpae,
         pageBreakdown: visits
       });
     });
@@ -1786,6 +1790,7 @@ app.get('/admin/dashboard', async (req, res) => {
         totalHowangpae,
         totalSuhopae,
         totalNusupae,
+        totalGimyeongpae,
         totalCards,
         totalOrders,
         totalRevenue,
