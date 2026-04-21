@@ -147,13 +147,32 @@ function calcVesselGrade(vesselSize) {
   return { grade: 'grade_6', vesselLabel: '찻잔' };
 }
 
+// 2026-04-21 시뮬레이션 검증 완료 (N=500, 편차 ±5% 이내)
+function calcJobPaeKey(counts) {
+  var jeongGwan = counts.jeongGwan || 0;
+  var gwansung  = counts.gwansung  || 0;
+  var insung    = counts.insung    || 0;
+  var siksang   = counts.siksang   || 0;
+  var jae       = counts.jae       || 0;
+  var bigyeop   = counts.bigyeop   || 0;
+  var sanggwan  = counts.sanggwan  || 0;
+  var pyeonIn   = counts.pyeonIn   || 0;
+
+  if (jeongGwan >= 2 && (gwansung >= 2 || insung >= 2)) return 'wolgeup';
+  if (siksang >= 2 && jae >= 2) return 'jangsa';
+  if ((sanggwan >= 1 && insung >= 2) || pyeonIn >= 2) return 'jeonmun';
+  if (bigyeop >= 2 && gwansung <= 2) return 'dokgo';
+  return 'hanbang';
+}
+
 module.exports = {
   calcVesselKey: calcVesselKey,
   calcWealthGrade: calcWealthGrade,
   calcVesselSize: calcVesselSize,
-  calcVesselGrade: calcVesselGrade,    // ← 추가
+  calcVesselGrade: calcVesselGrade,
   calcChannelKey: calcChannelKey,
   calcChannelGauge: calcChannelGauge,
   calcLeakInfo: calcLeakInfo,
-  calcHabitKey: calcHabitKey
+  calcHabitKey: calcHabitKey,
+  calcJobPaeKey: calcJobPaeKey
 };

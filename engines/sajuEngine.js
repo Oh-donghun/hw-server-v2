@@ -135,6 +135,9 @@ async function analyze(opts) {
   counts.hasSiksang = counts.siksang >= 2;
   counts.hasGwansung = counts.gwansung >= 1;
   counts.hasInsung = counts.insung >= 1;
+  counts.jeongGwan = allSipsin.filter(s => s && s.includes('정관')).length;
+  counts.sanggwan  = allSipsin.filter(s => s && s.includes('상관')).length;
+  counts.pyeonIn   = allSipsin.filter(s => s && s.includes('편인')).length;
 
   return {
     raw: saju,
