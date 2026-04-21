@@ -39,9 +39,28 @@ V2는 **현재 실서비스 중**이며 **최고 매출 발생 중**.
 | `calcLeakInfo(counts)` | leakKey 5종 + 레벨 5단 | 누수패, 누수처방 |
 | `calcHabitKey(counts)` | 오행 excess 6종 | 재물풀이 Ch.9 |
 
-### 신규 추가 예정
-- `calcJobPaeKey(counts)` — 직업체질 5종 (직업패, 직업처방)
+### 신규 추가 완료
+- `calcJobPaeKey(counts)` — 직업체질 5종 (직업패, 직업처방) ✅ 추가 완료
 - 자세한 로직은 `.claude/rules/jobpae.md` 참조
+
+---
+
+## ⚠️ 미해결: jikupTreatData.js Ch2 그릇 로직 통일성 문제
+
+**발생 일자:** 2026-04-21 세션 중단 시점
+
+### 문제 내용
+jikupTreatData.js Ch2 (사주 뿌리 분석) 설계 시 `calcVesselGrade` 6등급(가마솥~찻잔)을 조합 키로 사용하기로 확정했으나, 아래 중복 위험이 미검토 상태다.
+
+- `calcVesselGrade`는 재물풀이 Ch.2에서 **이미 "돈 그릇 크기"로 사용 중**
+- 직업처방 Ch.2에서 같은 vesselGrade를 "직업체질 × 그릇 관계"로 재사용하면 고객이 두 상품에서 동일 정보를 받는 느낌이 생길 수 있음
+
+### 대안 검토 필요
+- **A안 (현행 유지):** vesselGrade 6등급 그대로 사용 — 재물풀이 업셀 브릿지로 활용
+- **B안:** vesselGrade 대신 `strength × dayElement` (2×5=10 조합)으로 교체 — 재물풀이와 완전 분리
+- **C안:** Ch2 자체를 제거하고 Ch1 tail에 흡수
+
+**재개 시 사장님 결정 필요 (A/B/C안 선택 후 진행)**
 
 ---
 

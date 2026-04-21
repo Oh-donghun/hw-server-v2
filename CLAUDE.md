@@ -145,14 +145,20 @@
   → 월급 26.8% / 장사 27.4% / 전문가 18.8% / 독고다이 16.8% / 한방 10.2%
 - 0순위 절대 원칙 CLAUDE.md에 추가 (고객 만족 최우선 + 6레벨 테스트)
 - 업셀링 파이프라인 구조 확정: 직업패→직업처방→재물풀이Ch.6→본풀이Ch.4
+- jikupCardData.js 생성 완료 (5체질 카드 데이터 50개 — card_base/card_tail/meta)
+- jikupTreatData.js 7챕터 구조 확정 (Ch1~Ch7 키 조합 확정, 총 ~280 블록)
+- wolgeup 7챕터 초안 작성 완료 (Sonnet 4.6 초안 — wolgeup_ch1-7_sonnet_draft.md 보존)
 
 ### 진행 중 🔄
+- jikupTreatData.js 작업 중단 (Opus 4.7 전환 후 재개 예정)
+  - wolgeup Ch1~Ch7 초안 있음, Ch2 그릇 로직 재검토 필요
+  - 미해결: vesselGrade 사용 시 재물풀이 Ch.2와 로직 중복 여부 확인 필요
 - channelKey vs 직업체질 통합 방안 선택 (사장님 결정 대기 — 2단계 착수 전)
 
 ### 다음 작업 📌
-**1단계 (진행 중)**
-1. jikupCardData.js 생성 (직업패 무료 카드 — 5체질 훅 + 시각화)
-2. jikupTreatData.js 생성 (직업처방 7챕터 — 월급 체질 먼저 검토 후 확장)
+**1단계 (Opus 전환 후 재개)**
+1. ✅ jikupCardData.js — 완료
+2. jikupTreatData.js — wolgeup 초안 있음, Ch2 재검토 후 나머지 4체질 작성
 3. routes/jikup.js 라우터 신설
 4. 프론트: jikup.html, jikup-result.html
 
