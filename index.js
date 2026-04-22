@@ -269,7 +269,7 @@ app.post('/ask', async (req, res) => {
     const order = orderSnap.data();
 
     // 질문 횟수 확인
-    const maxQ = order.product === 'HW3' ? 3 : (order.product === 'HW2' ? 1 : 0);
+    const maxQ = (order.product === 'HW3' ? 3 : (order.product === 'HW2' ? 1 : 0)) + (order.extraQ || 0);
     const usedQ = order.askCount || 0;
     if (usedQ >= maxQ) return res.json({ success: false, error: '질문 횟수를 모두 사용했습니다' });
 
@@ -281,6 +281,7 @@ app.post('/ask', async (req, res) => {
     // 사주 컨텍스트 구성
     const sajuContext = `
 [사주 원국]
+- 생년월일: ${order.user?.birthDate || '미입력'}
 - 일간: ${resultData.dayGan || ''}(${resultData.dayGanOheng || ''})
 - 신강/신약: ${resultData.strength || ''}
 - 사주: ${resultData.fourPillars ? `년${resultData.fourPillars.year} 월${resultData.fourPillars.month} 일${resultData.fourPillars.day} 시${resultData.fourPillars.hour}` : ''}
