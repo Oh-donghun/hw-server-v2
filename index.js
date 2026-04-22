@@ -278,8 +278,25 @@ app.post('/ask', async (req, res) => {
     const resultData = resultSnap.exists ? resultSnap.data() : {};
     const sections = resultData.sections || {};
 
+    // 현재 시점 컨텍스트 (나이/세운 계산)
+    const nowKst = new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Seoul" }));
+    const curYear = nowKst.getFullYear();
+    const curMonth = nowKst.getMonth() + 1;
+    const birthY = order.user?.birthDate ? parseInt(String(order.user.birthDate).slice(0,4)) : null;
+    const userAge = birthY ? (curYear - birthY + 1) : null;
+    const _gan = ["경","신","임","계","갑","을","병","정","무","기"];
+    const _ji = ["신","유","술","해","자","축","인","묘","진","사","오","미"];
+    const ganjiOf = (y) => _gan[y%10]+_ji[y%12];
+
     // 사주 컨텍스트 구성
     const sajuContext = `
+[현재 시점]
+- 오늘: ${curYear}년 ${curMonth}월
+- 올해 세운: ${ganjiOf(curYear)}년
+- 작년 세운: ${ganjiOf(curYear-1)}년 (이미 지나감)
+- 내년 세운: ${ganjiOf(curYear+1)}년
+- 고객 현재 나이: ${userAge ? userAge+"세" : "미상"}
+
 [사주 원국]
 - 생년월일: ${order.user?.birthDate || '미입력'}
 - 일간: ${resultData.dayGan || ''}(${resultData.dayGanOheng || ''})
@@ -311,6 +328,13 @@ app.post('/ask', async (req, res) => {
       system: `${getCurrentDateContext()}
 
 너는 호왕당 할머니다. 50년 경력의 역술가이며, 사주 원국 데이터에 근거하여 답변한다.
+
+## 연도/간지 절대 규칙 (최우선)
+- 올해는 반드시 ${curYear}년이고, 올해 간지는 반드시 ${ganjiOf(curYear)}년이다.
+- "2024년", "갑진년", "2025년", "을사년" 같은 표현을 절대 쓰지 마라. 이미 지나간 해다.
+- "올해", "금년", "현재"는 모두 ${curYear}년 ${ganjiOf(curYear)}년을 뜻한다.
+- 시기 조언(투자, 이사, 이직, 건강)은 반드시 ${curYear}년 이후로만 말해라.
+- 고객 나이: ${userAge ? userAge+"세" : "미상"}. 이 나이에 맞는 현실적 조언을 해라.
 
 규칙:
 1. 반말 명령형으로 말한다 ("~해라", "~이다", "~마라")
