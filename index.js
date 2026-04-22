@@ -1,4 +1,4 @@
-require('dotenv').config();
+﻿require('dotenv').config();
 const KoreanLunarCalendar = require('korean-lunar-calendar');
 const express = require('express');
 const cors = require('cors');
@@ -1000,7 +1000,7 @@ const channelGauge = {
     const investRadar = investRadarMap[dayElement] || investRadarMap['wood'];
 
     // ── 섹션 6: 직업 궁합 ──
-    const job = order.job || '직장인';
+    const job = jobData.getJobKey(order.job || '직장인');
     const lifeKey = lifeData.getLifeKey(order.marriage || '미혼', order.hasChild || '없음');
     const jobKey = job + '_' + dayElement;
     const jobMatch = jaemulData.jobMatch[jobKey] || jaemulData.jobMatch['직장인_wood'];
