@@ -236,7 +236,7 @@ function calcLifetimeCareer(dayGan, daeunData, currentAge) {
 // ───────────────────────────────────────
 // 7챕터 조립
 // ───────────────────────────────────────
-function buildTreatChapters(jikupKey, labelCode, currentJob, gender, age, sajuMeta) {
+function buildTreatChapters(jikupKey, labelCode, currentJob, gender, age, sajuMeta, marriage, hasChild) {
   const jikupInfo = D.JIKUP_TYPES[jikupKey];
   const strengthType = sajuMeta.strength || 'balanced';
   const dayElement = sajuMeta.dayElement || 'wood';
@@ -253,10 +253,31 @@ function buildTreatChapters(jikupKey, labelCode, currentJob, gender, age, sajuMe
     body: T.ch2_sipseong[jikupKey] + '\n\n' + T.ch2_dayElement[dayElementKey] + '\n\n' + T.ch2_strength[strengthType]
   };
 
-  const ch3Key = `${currentJob}_${gender}`;
+  // Ch3 — 나이대 계산
+  let ageGroup = '30s';
+  if (age < 30)      ageGroup = '20s';
+  else if (age < 40) ageGroup = '30s';
+  else if (age < 50) ageGroup = '40s';
+  else               ageGroup = '50s';
+
+  // Key 우선순위: 직업_성별_나이대 → 직업_male_나이대 → 직업_성별_30s → 직업_male_30s → fallback
+  const ch3Key = `${currentJob}_${gender}_${ageGroup}`;
+  const ch3BaseBody =
+    T.ch3_reality[ch3Key] ||
+    T.ch3_reality[`${currentJob}_male_${ageGroup}`] ||
+    T.ch3_reality[`${currentJob}_${gender}_30s`] ||
+    T.ch3_reality[`${currentJob}_male_30s`] ||
+    '지금의 자리에서 너의 사주가 작동하고 있다.';
+
+  // 결혼/자녀 꼬리 붙이기
+  const marriageTail = (marriage && T.ch3_marriage_tail && T.ch3_marriage_tail[marriage]) || '';
+  const childTail    = (hasChild && T.ch3_child_tail    && T.ch3_child_tail[hasChild])    || '';
+  const ch3Tails = [marriageTail, childTail].filter(Boolean).join('\n\n');
+  const ch3Body = ch3Tails ? (ch3BaseBody + '\n\n' + ch3Tails) : ch3BaseBody;
+
   const ch3 = {
     title: 'Ch3. 너의 현실',
-    body: T.ch3_reality[ch3Key] || T.ch3_reality[`${currentJob}_male`] || '지금의 자리에서 너의 사주가 작동하고 있다.'
+    body: ch3Body
   };
 
   const ch4Key = `${labelCode}_${jikupKey}`;
@@ -278,7 +299,7 @@ function buildTreatChapters(jikupKey, labelCode, currentJob, gender, age, sajuMe
 
   const ch7 = {
     title: 'Ch7. 다음 — 재물풀이로',
-    body: T.ch7_bridge[jikupKey] + '\n\n' + T.ch7_closer
+    body: T.ch7_bridge[jikupKey]
   };
 
   return [ch1, ch2, ch3, ch4, ch5, ch6, ch7];
@@ -332,7 +353,7 @@ router.post('/api/v2/jikup-treat', async (req, res) => {
     }
 
     // 7챕터 조립
-    const chapters = buildTreatChapters(jikupKey, labelCode, currentJob, gender, age, sajuMeta);
+    const chapters = buildTreatChapters(jikupKey, labelCode, currentJob, gender, age, sajuMeta, order.marriage || '', order.hasChild || '');
 
     // 생애 직업운 그래프 (1살~80세)
     const lifetimeCareer = calcLifetimeCareer(
