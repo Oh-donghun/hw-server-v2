@@ -112,13 +112,10 @@ function calcLifetimeCareer(dayGan, daeunData, currentAge) {
     const needBoost = Math.max(0, pastMax - futureMax + 12);
 
     if (needBoost > 0) {
-      // 미래 최고 대운을 피크로 끌어올림
       const peakIdx = daeunScores.findIndex(
         d => d.age > currentAge && d.age <= 80 && d.score === futureMax
       );
       if (peakIdx >= 0) daeunScores[peakIdx].score = Math.min(95, daeunScores[peakIdx].score + needBoost);
-
-      // 주변 대운도 덩달아 살짝 올림 (완만한 피크)
       if (peakIdx - 1 >= 0 && daeunScores[peakIdx - 1].age > currentAge) {
         daeunScores[peakIdx - 1].score = Math.min(90, daeunScores[peakIdx - 1].score + needBoost * 0.5);
       }
@@ -127,12 +124,37 @@ function calcLifetimeCareer(dayGan, daeunData, currentAge) {
       }
     }
 
-    // 3) 현재 이후 구간 전체 완만한 상승 보정 (+3~5점)
+    // 3) 현재 이후 전 구간 완만한 상승 보정
     daeunScores.forEach(d => {
       if (d.age > currentAge && d.age <= 80) {
         d.score = Math.min(95, d.score + 3);
       }
     });
+
+    // 4) 미래 전 구간 최저점 플로어 (65점 이상 보장)
+    daeunScores.forEach(d => {
+      if (d.age > currentAge && d.age <= 90) {
+        d.score = Math.max(d.score, 65);
+      }
+    });
+
+    // 5) 말년 안정 보정 (65~85세 구간은 68점 이상)
+    daeunScores.forEach(d => {
+      if (d.age >= 65 && d.age <= 85) {
+        d.score = Math.max(d.score, 68);
+      }
+    });
+
+    // 6) 연속 대운 기울기 완화 (차이 12점 초과 시 뒤 대운을 끌어올림)
+    // 현재 이후 대운만 적용하여 과거는 그대로 둠
+    for (let i = 1; i < daeunScores.length; i++) {
+      if (daeunScores[i].age <= currentAge) continue;
+      const prev = daeunScores[i-1].score;
+      const curr = daeunScores[i].score;
+      if (prev - curr > 12) {
+        daeunScores[i].score = Math.min(95, prev - 12);
+      }
+    }
   }
 
   // 4) 1살 단위 부드러운 보간 (1~90세)
