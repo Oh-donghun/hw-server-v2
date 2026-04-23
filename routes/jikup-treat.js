@@ -29,6 +29,155 @@ function extractBirthYear(birthStr) {
 }
 
 // ───────────────────────────────────────
+// 생애 직업운 그래프 계산 (1살~80세)
+// ───────────────────────────────────────
+
+// 천간 → 오행
+const GAN_TO_OHENG = {
+  '甲':'wood','乙':'wood','丙':'fire','丁':'fire','戊':'earth',
+  '己':'earth','庚':'metal','辛':'metal','壬':'water','癸':'water'
+};
+// 천간 → 음양
+const GAN_TO_YINYANG = {
+  '甲':'yang','丙':'yang','戊':'yang','庚':'yang','壬':'yang',
+  '乙':'yin','丁':'yin','己':'yin','辛':'yin','癸':'yin'
+};
+
+// 일간(dayGan) 기준 상대 천간의 십성 판정
+function getSipseongFromGan(dayGan, targetGan) {
+  const dayOheng = GAN_TO_OHENG[dayGan];
+  const dayYinyang = GAN_TO_YINYANG[dayGan];
+  const tOheng = GAN_TO_OHENG[targetGan];
+  const tYinyang = GAN_TO_YINYANG[targetGan];
+  if (!dayOheng || !tOheng) return null;
+
+  const samePol = (dayYinyang === tYinyang);
+
+  // 오행 관계
+  const relation = {
+    wood:  { wood: 'self',   fire: 'output', earth: 'control', metal: 'restrict', water: 'source' },
+    fire:  { fire: 'self',   earth:'output', metal: 'control', water: 'restrict', wood:  'source' },
+    earth: { earth:'self',   metal:'output', water: 'control', wood:  'restrict', fire:  'source' },
+    metal: { metal:'self',   water:'output', wood:  'control', fire:  'restrict', earth: 'source' },
+    water: { water:'self',   wood: 'output', fire:  'control', earth: 'restrict', metal: 'source' }
+  };
+  const rel = relation[dayOheng][tOheng];
+
+  if (rel === 'self')     return samePol ? '비견' : '겁재';
+  if (rel === 'output')   return samePol ? '식신' : '상관';
+  if (rel === 'control')  return samePol ? '편재' : '정재';
+  if (rel === 'restrict') return samePol ? '편관' : '정관';
+  if (rel === 'source')   return samePol ? '편인' : '정인';
+  return null;
+}
+
+// 십성 → 직업운 점수
+const SIPSEONG_CAREER_SCORE = {
+  '정관': 88, '편관': 85,   // 관성 = 피크
+  '정재': 78, '편재': 75,   // 재성
+  '정인': 72, '편인': 68,   // 인성
+  '식신': 65, '상관': 62,   // 식상
+  '비견': 55, '겁재': 50    // 비겁
+};
+
+// Catmull-Rom 기반 부드러운 보간
+function smoothInterpolate(before, after, age) {
+  if (before.age === after.age) return before.score;
+  const t = (age - before.age) / (after.age - before.age);
+  // smoothstep: t가 경계에서 부드럽게
+  const smoothT = t * t * (3 - 2 * t);
+  return before.score + (after.score - before.score) * smoothT;
+}
+
+// 생애 직업운 계산 (1~90세)
+function calcLifetimeCareer(dayGan, daeunData, currentAge) {
+  if (!daeunData || !daeunData.daeuns || daeunData.daeuns.length === 0) return null;
+
+  const daeuns = daeunData.daeuns;
+  const startAge = daeunData.startAge || daeuns[0].age || 8;
+
+  // 1) 각 대운의 원점수
+  const daeunScores = daeuns.map(d => {
+    const sipseong = getSipseongFromGan(dayGan, d.gan);
+    const score = SIPSEONG_CAREER_SCORE[sipseong] || 60;
+    return { age: d.age, score, sipseong, pillar: d.pillar };
+  });
+
+  // 2) 미래 우상향 보정 (핵심 UX)
+  const pastMax = Math.max(...daeunScores.filter(d => d.age <= currentAge).map(d => d.score), 0);
+  const futureDaeuns = daeunScores.filter(d => d.age > currentAge && d.age <= 80);
+
+  if (futureDaeuns.length > 0) {
+    const futureMax = Math.max(...futureDaeuns.map(d => d.score));
+    const needBoost = Math.max(0, pastMax - futureMax + 12);
+
+    if (needBoost > 0) {
+      // 미래 최고 대운을 피크로 끌어올림
+      const peakIdx = daeunScores.findIndex(
+        d => d.age > currentAge && d.age <= 80 && d.score === futureMax
+      );
+      if (peakIdx >= 0) daeunScores[peakIdx].score = Math.min(95, daeunScores[peakIdx].score + needBoost);
+
+      // 주변 대운도 덩달아 살짝 올림 (완만한 피크)
+      if (peakIdx - 1 >= 0 && daeunScores[peakIdx - 1].age > currentAge) {
+        daeunScores[peakIdx - 1].score = Math.min(90, daeunScores[peakIdx - 1].score + needBoost * 0.5);
+      }
+      if (peakIdx + 1 < daeunScores.length && daeunScores[peakIdx + 1].age <= 80) {
+        daeunScores[peakIdx + 1].score = Math.min(90, daeunScores[peakIdx + 1].score + needBoost * 0.3);
+      }
+    }
+
+    // 3) 현재 이후 구간 전체 완만한 상승 보정 (+3~5점)
+    daeunScores.forEach(d => {
+      if (d.age > currentAge && d.age <= 80) {
+        d.score = Math.min(95, d.score + 3);
+      }
+    });
+  }
+
+  // 4) 1살 단위 부드러운 보간 (1~90세)
+  const lifetime = [];
+  for (let age = 1; age <= 90; age++) {
+    let score;
+    if (age < startAge) {
+      const first = daeunScores[0].score;
+      score = first * (0.65 + 0.35 * (age / startAge));
+    } else {
+      let before = daeunScores[0];
+      let after = daeunScores[daeunScores.length - 1];
+      for (let i = 0; i < daeunScores.length; i++) {
+        if (daeunScores[i].age <= age) before = daeunScores[i];
+        if (daeunScores[i].age > age) { after = daeunScores[i]; break; }
+      }
+      score = smoothInterpolate(before, after, age);
+    }
+    lifetime.push({ age, score: Math.round(score * 10) / 10 });
+  }
+
+  // 5) 피크/저점 찾기 (1~90세 범위)
+  const peakPoint = lifetime.reduce((a, b) => b.score > a.score ? b : a, lifetime[0]);
+  const troughPoint = lifetime.reduce((a, b) => b.score < a.score ? b : a, lifetime[0]);
+
+  // 6) 대운별 십성 라벨 (UI용)
+  const daeunLabels = daeunScores.map(d => ({
+    age: d.age,
+    pillar: d.pillar,
+    sipseong: d.sipseong,
+    score: Math.round(d.score)
+  }));
+
+  return {
+    points: lifetime,
+    peakAge: peakPoint.age,
+    peakScore: peakPoint.score,
+    troughAge: troughPoint.age,
+    troughScore: troughPoint.score,
+    currentAge,
+    daeunLabels
+  };
+}
+
+// ───────────────────────────────────────
 // 7챕터 조립
 // ───────────────────────────────────────
 function buildTreatChapters(jikupKey, labelCode, currentJob, gender, age, sajuMeta) {
@@ -129,6 +278,13 @@ router.post('/api/v2/jikup-treat', async (req, res) => {
     // 7챕터 조립
     const chapters = buildTreatChapters(jikupKey, labelCode, currentJob, gender, age, sajuMeta);
 
+    // 생애 직업운 그래프 (1살~80세)
+    const lifetimeCareer = calcLifetimeCareer(
+      sajuMeta.dayGan,
+      sajuMeta.daeun,
+      age
+    );
+
     // 카드 정보
     const jikupInfo = D.JIKUP_TYPES[jikupKey];
 
@@ -146,6 +302,7 @@ router.post('/api/v2/jikup-treat', async (req, res) => {
       gunghap: gunghap,
       incomeRange: incomeRange,
       chapters,
+      lifetimeCareer,
       sajuMeta: sajuMeta,
       jikupKey,
       labelCode,
