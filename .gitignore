@@ -11,3 +11,10 @@ createTestOrder.js
 createTestOrders.js
 debug_result.json
 *.bak*
+# Test & debug scripts
+test-*.js
+check-*.js
+extract-*.js
+DEPLOY_TRIGGER.txt
+.claude/
+hw-server-v3/
