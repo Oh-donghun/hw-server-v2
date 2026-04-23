@@ -27,7 +27,11 @@ app.use(express.json());
 
 // ── 모듈화된 라우트 ──
 const jaemulRouter = require('./routes/jaemul');
+const jikupCardRouter = require('./routes/jikup');
+const jikupTreatRouter = require('./routes/jikup-treat');
 app.use(jaemulRouter);
+app.use(jikupCardRouter);
+app.use(jikupTreatRouter);
 
 const gimyeongRouter = require('./routes/gimyeong');  // ← 추가
 app.use(gimyeongRouter);                               // ← 추가
@@ -78,7 +82,8 @@ const PRODUCTS = {
   HW1: { name: '초견', price: 4900, questions: 0 },
   HW2: { name: '재물풀이', price: 19800, questions: 1 },
   HW3: { name: '본풀이', price: 49700, questions: 3 },
-  NUSU: { name: '누수처방', price: 9900, questions: 0 }
+  NUSU: { name: '누수처방', price: 9900, questions: 0 },
+  JIKUP: { name: '직업처방', price: 9900, questions: 0 }
 };
 const UPGRADE_PRICES = { HW2: 14900, HW3: 29900, HW2_FROM_NUSU: 9900 };
 
@@ -147,7 +152,7 @@ const isUpgrade = req.body.upgradeFrom ? true : false;
     let finalPrice = prod.price;
     if (isUpgrade) {
       const fromProduct = req.body.fromProduct || '';
-      if (fromProduct === 'NUSU' && product === 'HW2') finalPrice = UPGRADE_PRICES.HW2_FROM_NUSU || 9900;
+      if ((fromProduct === 'NUSU' || fromProduct === 'JIKUP') && product === 'HW2') finalPrice = UPGRADE_PRICES.HW2_FROM_NUSU || 9900;
       else if (UPGRADE_PRICES[product]) finalPrice = UPGRADE_PRICES[product];
     }
     await db.collection('hw-orders').doc(orderId).set({
@@ -156,6 +161,7 @@ const isUpgrade = req.body.upgradeFrom ? true : false;
       user: { name, phone, gender: normalizeGender(resolvedGender), birthDate: birthDate || '', calendar: req.body.calendarType || req.body.calType || 'solar', birthTime: birthTime || '' },
       question: question || '', question2: req.body.question2 || '', job: req.body.job || '', marriage: req.body.marriage || '미입력', hasChild: req.body.hasChild || '없음', interest: req.body.interest || '전체', status: 'pending', paymentStatus: 'waiting', questionsLeft: prod.questions,
       nusuCard: req.body.nusuCard || null,
+      jikupCard: req.body.jikupCard || null,
       createdAt: FieldValue.serverTimestamp(), updatedAt: FieldValue.serverTimestamp()
     });
     res.json({ success: true, orderId, productName: prod.name, price: finalPrice });
@@ -192,13 +198,16 @@ app.post('/confirm', async (req, res) => {
     if (orderData.product === 'HW3') {
       axios.post(`http://localhost:${PORT}/api/bonpuri`, { orderId }).catch(e => console.error('bonpuri auto:', e.message));
     }
+    if (orderData.product === 'JIKUP') {
+      axios.post(`http://localhost:${PORT}/api/v2/jikup-treat`, { orderId }).catch(e => console.error('jikup-treat auto:', e.message));
+    }
     if (orderData.product === 'NUSU') {
       axios.post(`http://localhost:${PORT}/api/v2/nusu-treat`, { orderId }).catch(e => console.error('nusu-treat auto:', e.message));
     }
 
     // ── 알림톡 1: 결제 완료 ──
-    const resultPages = { HW1: 'v2/chogyeon-result.html', HW2: 'v2/jaemul-result.html', HW3: 'v2/bonpuli-result.html', NUSU: 'v2/nusu-result.html' };
-    const productNames = { HW1: '초견', HW2: '재물풀이', HW3: '본풀이', NUSU: '누수처방' };
+    const resultPages = { HW1: 'v2/chogyeon-result.html', HW2: 'v2/jaemul-result.html', HW3: 'v2/bonpuli-result.html', NUSU: 'v2/nusu-result.html', JIKUP: 'v2/jikup-treat-result.html' };
+    const productNames = { HW1: '초견', HW2: '재물풀이', HW3: '본풀이', NUSU: '누수처방', JIKUP: '직업처방' };
     let _rp = resultPages[orderData.product];
     if (orderData.product === 'HW2' && orderData.isUpgrade && orderData.upgradeFrom) {
       try { const _fo = await db.collection('hw-orders').doc(orderData.upgradeFrom).get();
@@ -449,6 +458,17 @@ app.post('/api/howangpae', async (req, res) => {
   }
 });
 
+app.get('/_debug/routes', (req, res) => {
+  const routes = [];
+  app._router.stack.forEach(m => {
+    if (m.route) routes.push(m.route.path);
+    else if (m.name === 'router' && m.handle.stack) {
+      m.handle.stack.forEach(h => { if (h.route) routes.push(h.route.path); });
+    }
+  });
+  res.json(routes);
+});
+
 const PORT = process.env.PORT || 8080;
 
 // ============ 토스페이먼츠 결제 승인 ============
@@ -498,13 +518,16 @@ app.post('/payment/confirm', async (req, res) => {
     if (orderData.product === 'HW3') {
       axios.post(`http://localhost:${PORT}/api/bonpuri`, { orderId }).catch(e => console.error('bonpuri auto:', e.message));
     }
+    if (orderData.product === 'JIKUP') {
+      axios.post(`http://localhost:${PORT}/api/v2/jikup-treat`, { orderId }).catch(e => console.error('jikup-treat auto:', e.message));
+    }
     if (orderData.product === 'NUSU') {
       axios.post(`http://localhost:${PORT}/api/v2/nusu-treat`, { orderId }).catch(e => console.error('nusu-treat auto:', e.message));
     }
 
     // ── 알림톡 1: 결제 완료 ──
-    const resultPages = { HW1: 'v2/chogyeon-result.html', HW2: 'v2/jaemul-result.html', HW3: 'v2/bonpuli-result.html', NUSU: 'v2/nusu-result.html' };
-    const productNames = { HW1: '초견', HW2: '재물풀이', HW3: '본풀이', NUSU: '누수처방' };
+    const resultPages = { HW1: 'v2/chogyeon-result.html', HW2: 'v2/jaemul-result.html', HW3: 'v2/bonpuli-result.html', NUSU: 'v2/nusu-result.html', JIKUP: 'v2/jikup-treat-result.html' };
+    const productNames = { HW1: '초견', HW2: '재물풀이', HW3: '본풀이', NUSU: '누수처방', JIKUP: '직업처방' };
     let _rp = resultPages[orderData.product];
     if (orderData.product === 'HW2' && orderData.isUpgrade && orderData.upgradeFrom) {
       try { const _fo = await db.collection('hw-orders').doc(orderData.upgradeFrom).get();
