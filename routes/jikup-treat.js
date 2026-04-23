@@ -103,65 +103,92 @@ function calcLifetimeCareer(dayGan, daeunData, currentAge) {
     return { age: d.age, score, sipseong, pillar: d.pillar };
   });
 
-  // 2) 미래 완전 우상향 보정 (핵심 UX: 현재보다 나은 미래)
-  // 원칙: 현재 이후는 계속 올라감. 절대 떨어지지 않음.
+  // 2) 사주 기반 피크 배치 (40~55세 황금기 원칙)
+  // 원칙: 과거는 원점수 그대로. 현재 이후는 "피크를 향해 오르고, 피크 후 완만한 고원"
   const currentDaeunIdx = daeunScores.findIndex(
     (d, i) => d.age <= currentAge && (i === daeunScores.length - 1 || daeunScores[i+1].age > currentAge)
   );
 
-  // 현재가 속한 대운의 점수 = 현재 기준점
-  const currentDaeunScore = currentDaeunIdx >= 0 ? daeunScores[currentDaeunIdx].score : 65;
+  // 피크 목표 연령 구간 결정 (현재 나이별 분기)
+  let peakMinAge, peakMaxAge;
+  if (currentAge < 35)        { peakMinAge = 40; peakMaxAge = 55; }
+  else if (currentAge < 45)   { peakMinAge = currentAge + 5; peakMaxAge = Math.max(60, currentAge + 15); }
+  else if (currentAge < 55)   { peakMinAge = currentAge + 5; peakMaxAge = currentAge + 15; }
+  else                        { peakMinAge = currentAge + 3; peakMaxAge = currentAge + 12; }
 
-  // 현재 이후 대운들의 십성 순위 유지하면서 점수만 재배치
-  const futureIndices = [];
-  for (let i = 0; i < daeunScores.length; i++) {
-    if (daeunScores[i].age > currentAge && daeunScores[i].age <= 90) futureIndices.push(i);
+  // 십성별 피크 점수 (우선순위)
+  const SIPSEONG_PEAK_SCORE = {
+    '정관': 93, '편관': 92, '정재': 91, '편재': 90,
+    '정인': 89, '편인': 88, '식신': 87, '상관': 86,
+    '비견': 85, '겁재': 84
+  };
+  const SIPSEONG_RANK = {
+    '정관': 1, '편관': 2, '정재': 3, '편재': 4,
+    '정인': 5, '편인': 6, '식신': 7, '상관': 8,
+    '비견': 9, '겁재': 10
+  };
+
+  // 피크 구간 안의 대운 중 가장 좋은 십성을 가진 대운을 선택
+  const peakCandidates = daeunScores
+    .map((d, i) => ({ ...d, idx: i }))
+    .filter(d => d.age >= peakMinAge && d.age <= peakMaxAge);
+
+  let peakIdx = -1;
+  let peakScoreTarget = 87; // fallback
+  if (peakCandidates.length > 0) {
+    // 십성 순위가 가장 좋은(숫자가 작은) 대운 선택, 동률이면 가까운 쪽
+    peakCandidates.sort((a, b) => {
+      const rankA = SIPSEONG_RANK[a.sipseong] || 99;
+      const rankB = SIPSEONG_RANK[b.sipseong] || 99;
+      if (rankA !== rankB) return rankA - rankB;
+      return a.age - b.age;
+    });
+    const picked = peakCandidates[0];
+    peakIdx = picked.idx;
+    peakScoreTarget = SIPSEONG_PEAK_SCORE[picked.sipseong] || 87;
+  } else {
+    // 피크 구간에 대운이 없으면 현재 이후 첫 대운을 피크로
+    const firstFuture = daeunScores.findIndex(d => d.age > currentAge);
+    if (firstFuture >= 0) {
+      peakIdx = firstFuture;
+      peakScoreTarget = SIPSEONG_PEAK_SCORE[daeunScores[firstFuture].sipseong] || 87;
+    }
   }
 
-  if (futureIndices.length > 0) {
-    // 원래 점수의 상대 순위 보존용
-    const originalScores = futureIndices.map(i => daeunScores[i].score);
-    const sortedAsc = [...originalScores].sort((a, b) => a - b);
-    const rankMap = originalScores.map(s => sortedAsc.indexOf(s));
+  // 미래 대운 점수 재배치
+  if (peakIdx >= 0) {
+    const peakAgeTarget = daeunScores[peakIdx].age;
 
-    // 우상향 기준 점수 배열 생성
-    // 현재 점수 + 4 부터 시작, 최대 93점까지
-    const base = Math.max(currentDaeunScore + 3, 70);
-    const peakScore = 93;
-    const step = futureIndices.length > 1
-      ? (peakScore - base) / (futureIndices.length - 1)
-      : 0;
+    // 현재가 속한 대운 점수 (기준점)
+    const baseScore = currentDaeunIdx >= 0 ? Math.min(daeunScores[currentDaeunIdx].score, 76) : 70;
+    if (currentDaeunIdx >= 0) daeunScores[currentDaeunIdx].score = baseScore;
 
-    // 기본 우상향 곡선
-    const baseCurve = futureIndices.map((_, idx) => Math.round(base + step * idx));
+    daeunScores.forEach((d, i) => {
+      if (d.age <= currentAge) return; // 과거는 건드리지 않음
+      if (d.age > 90) return;
 
-    // 십성 기반 미세 조정 (±2점 내): 관성/재성 십성이 있는 대운은 살짝 올리고, 비겁은 살짝 낮춤
-    futureIndices.forEach((idx, pos) => {
-      const d = daeunScores[idx];
-      let adjusted = baseCurve[pos];
-
-      // 십성별 ±2점 조정
-      if (d.sipseong === '정관' || d.sipseong === '편관') adjusted += 2;
-      else if (d.sipseong === '정재' || d.sipseong === '편재') adjusted += 1;
-      else if (d.sipseong === '비견' || d.sipseong === '겁재') adjusted -= 1;
-
-      daeunScores[idx].score = Math.min(95, Math.max(base, adjusted));
+      if (i < peakIdx) {
+        // 현재 ~ 피크: 등차로 가파르게 상승
+        const stepsTotal = peakIdx - currentDaeunIdx;
+        const stepPos = i - currentDaeunIdx;
+        const ratio = stepPos / stepsTotal;
+        d.score = Math.round(baseScore + (peakScoreTarget - baseScore) * ratio);
+      } else if (i === peakIdx) {
+        // 피크
+        d.score = peakScoreTarget;
+      } else {
+        // 피크 이후: 매우 완만한 하강 (대운마다 -1~-2)
+        const declineSteps = i - peakIdx;
+        d.score = Math.max(peakScoreTarget - 10, peakScoreTarget - declineSteps * 2);
+      }
     });
 
-    // 절대 원칙: 이전 대운보다 작지 않게 (연속 대운 monotonic increasing)
-    for (let i = 1; i < futureIndices.length; i++) {
-      const prevIdx = futureIndices[i-1];
-      const currIdx = futureIndices[i];
-      if (daeunScores[currIdx].score < daeunScores[prevIdx].score) {
-        daeunScores[currIdx].score = daeunScores[prevIdx].score;
+    // 플로어: 미래 구간 최저 80점 (피크 후에도 너무 안 떨어지게)
+    daeunScores.forEach(d => {
+      if (d.age > currentAge && d.age <= 90) {
+        d.score = Math.max(d.score, Math.min(80, peakScoreTarget - 10));
       }
-    }
-
-    // 현재가 속한 대운 점수도 기준점 맞춤 (보간 자연스럽게)
-    if (currentDaeunIdx >= 0 && daeunScores[currentDaeunIdx].score > base - 2) {
-      // 현재 대운 점수가 너무 높으면 base-2로 낮춰서 우상향이 살아나게
-      daeunScores[currentDaeunIdx].score = Math.min(daeunScores[currentDaeunIdx].score, base - 2);
-    }
+    });
   }
 
   // 4) 1살 단위 부드러운 보간 (1~90세)
