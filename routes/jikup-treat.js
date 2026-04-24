@@ -324,7 +324,22 @@ router.post('/api/v2/jikup-treat', async (req, res) => {
     const resultRef = getDb().collection('hw-results').doc(orderId);
     const existing = await resultRef.get();
     if (existing.exists) {
-      return res.json({ success: true, cached: true, result: existing.data() });
+      const data = existing.data();
+      const isValidJikup =
+        data.product === 'JIKUP' &&
+        Array.isArray(data.chapters) &&
+        data.chapters.length === 7;
+
+      if (isValidJikup) {
+        return res.json({ success: true, cached: true, result: data });
+      }
+
+      // CORRUPTED CACHE DETECTED - 잘못된 형식 감지, 삭제 후 재생성
+      console.warn(
+        `[jikup-treat] CORRUPTED CACHE DETECTED orderId=${orderId} ` +
+        `product=${data.product} chapters=${Array.isArray(data.chapters) ? data.chapters.length : 'none'} - deleting and regenerating`
+      );
+      await resultRef.delete();
     }
 
     // 무료 카드 데이터 필수

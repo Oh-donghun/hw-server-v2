@@ -155,6 +155,22 @@ const isUpgrade = req.body.upgradeFrom ? true : false;
       if ((fromProduct === 'NUSU' || fromProduct === 'JIKUP') && product === 'HW2') finalPrice = UPGRADE_PRICES.HW2_FROM_NUSU || 9900;
       else if (UPGRADE_PRICES[product]) finalPrice = UPGRADE_PRICES[product];
     }
+    // ORDER_ID_CONFLICT 가드: 기존 주문 product 다르면 거부, 기존 결과 있으면 거부
+    const existingOrder = await db.collection('hw-orders').doc(orderId).get();
+    if (existingOrder.exists && existingOrder.data().product !== product) {
+      return res.status(409).json({
+        success: false,
+        error: 'ORDER_ID_CONFLICT: existing product=' + existingOrder.data().product + ', requested=' + product
+      });
+    }
+    const existingResult = await db.collection('hw-results').doc(orderId).get();
+    if (existingResult.exists) {
+      return res.status(409).json({
+        success: false,
+        error: 'ORDER_ID_CONFLICT: result already exists for this orderId'
+      });
+    }
+
     await db.collection('hw-orders').doc(orderId).set({
       orderId, product, productName: prod.name, price: finalPrice, payMethod: 'toss',
       isUpgrade, upgradeFrom: req.body.upgradeFrom || '',
@@ -262,7 +278,16 @@ app.get('/result/:id', async (req, res) => {
   try {
     const doc = await db.collection('hw-results').doc(req.params.id).get();
     if (!doc.exists) return res.status(404).json({ error: 'not found' });
-    res.json({ success: true, data: doc.data() });
+    const data = doc.data();
+    // RESULT_PRODUCT_MISMATCH 가드: ?product= 쿼리 있으면 일치 검증
+    const expectedProduct = req.query.product;
+    if (expectedProduct && data.product && data.product !== expectedProduct) {
+      return res.status(409).json({
+        success: false,
+        error: 'RESULT_PRODUCT_MISMATCH: expected=' + expectedProduct + ', actual=' + data.product
+      });
+    }
+    res.json({ success: true, data });
   } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
