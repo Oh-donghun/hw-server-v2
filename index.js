@@ -1578,9 +1578,9 @@ app.post('/admin/resend-alimtalk', async (req, res) => {
     const phone = order.user.phone || order.phone;
     const name = order.user.name || '';
     const product = order.product;
-    const pages = { HW1: 'chogyeon-result.html', HW2: 'jaemul-result.html', HW3: 'bonpuli-result.html' };
-    const templates = { HW1: 'KA01TP260324060639604xT0jd6AkDxQ', HW2: 'KA01TP2603240607193278WcUpI0NqMM', HW3: 'KA01TP260321085605954kaAWDuPslLp' };
-    const btnNames = { HW1: '초견 결과 확인하기', HW2: '재물풀이 결과 확인하기', HW3: '본풀이 결과 확인하기' };
+    const pages = { HW1: 'chogyeon-result.html', HW2: 'jaemul-result.html', HW3: 'bonpuli-result.html', NUSU: 'nusu-result.html', JIKUP: 'jikup-treat-result.html' };
+    const templates = { HW1: 'KA01TP260324060639604xT0jd6AkDxQ', HW2: 'KA01TP2603240607193278WcUpI0NqMM', HW3: 'KA01TP260321085605954kaAWDuPslLp', NUSU: 'KA01TP260321085423857M5svGoKweVR', JIKUP: 'KA01TP260321085423857M5svGoKweVR' };
+    const btnNames = { HW1: '초견 결과 확인하기', HW2: '재물풀이 결과 확인하기', HW3: '본풀이 결과 확인하기', NUSU: '누수처방 결과 확인하기', JIKUP: '직업처방 결과 확인하기' };
     const resultURL = 'readmelab.github.io/howangdang/' + pages[product] + '?id=' + orderId;
     await sendAlimtalk(phone, templates[product], {
       '#{이름}': name,
@@ -1795,7 +1795,7 @@ let totalGimyeongpae = 0;
       .get();
 
     let totalRevenue = 0;
-    const productStats = { HW1: { count: 0, revenue: 0 }, HW2: { count: 0, revenue: 0 }, HW3: { count: 0, revenue: 0 }, NUSU: { count: 0, revenue: 0 } };
+    const productStats = { HW1: { count: 0, revenue: 0 }, HW2: { count: 0, revenue: 0 }, HW3: { count: 0, revenue: 0 }, NUSU: { count: 0, revenue: 0 }, JIKUP: { count: 0, revenue: 0 } };
     const recentOrders = [];
     let upgradeCount = 0;
 
@@ -1839,7 +1839,7 @@ let totalGimyeongpae = 0;
     });
 
     // 3) 전환율
-    const totalOrders = productStats.HW1.count + productStats.HW2.count + productStats.HW3.count + productStats.NUSU.count;
+    const totalOrders = productStats.HW1.count + productStats.HW2.count + productStats.HW3.count + productStats.NUSU.count + productStats.JIKUP.count;
     const totalCards = totalHowangpae + totalSuhopae + totalNusupae;
 
 
