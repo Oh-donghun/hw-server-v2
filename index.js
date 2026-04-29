@@ -610,7 +610,8 @@ app.post('/payment/confirm', async (req, res) => {
 app.get('/admin/orders', async (req, res) => {
   try {
     if (req.query.pw !== '2991') return res.status(403).json({ success: false, error: 'unauthorized' });
-    const snapshot = await db.collection('hw-orders').orderBy('createdAt', 'desc').limit(100).get();
+    const limit = Math.min(Math.max(parseInt(req.query.limit) || 500, 1), 5000);
+    const snapshot = await db.collection('hw-orders').orderBy('createdAt', 'desc').limit(limit).get();
     const orders = [];
     snapshot.forEach(doc => {
       const d = doc.data();
