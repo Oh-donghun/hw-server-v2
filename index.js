@@ -217,9 +217,10 @@ app.post('/confirm', async (req, res) => {
     try {
       const payToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
       const payHour = new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul', hour: '2-digit', hour12: false }).padStart(2, '0');
+    const payHourFixed = payHour === '24' ? '00' : payHour;
       const payRef = db.collection('hw-analytics').doc(payToday);
       await payRef.set({ date: payToday, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      await payRef.update({ [`hourly.${payHour}.orders`]: FieldValue.increment(1) });
+      await payRef.update({ [`hourly.${payHourFixed}.orders`]: FieldValue.increment(1) });
     } catch(ae) { console.error('hourly order track error:', ae.message); }
 
     // 자동 풀이 생성 (백그라운드)
@@ -546,9 +547,10 @@ app.post('/payment/confirm', async (req, res) => {
     try {
       const payToday = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
       const payHour = new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul', hour: '2-digit', hour12: false }).padStart(2, '0');
+    const payHourFixed = payHour === '24' ? '00' : payHour;
       const payRef = db.collection('hw-analytics').doc(payToday);
       await payRef.set({ date: payToday, updatedAt: FieldValue.serverTimestamp() }, { merge: true });
-      await payRef.update({ [`hourly.${payHour}.orders`]: FieldValue.increment(1) });
+      await payRef.update({ [`hourly.${payHourFixed}.orders`]: FieldValue.increment(1) });
     } catch(ae) { console.error('hourly order track error:', ae.message); }
 
     // 결제 확인 후 자동 풀이 생성 (백그라운드)
@@ -1282,6 +1284,7 @@ app.post('/api/track/visit', async (req, res) => {
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' }); // YYYY-MM-DD
 
     const hour = new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul', hour: '2-digit', hour12: false }).padStart(2, '0');
+    const hourFixed = hour === '24' ? '00' : hour;
     const dailyRef = db.collection('hw-analytics').doc(today);
     await dailyRef.set({
       date: today,
@@ -1290,7 +1293,7 @@ app.post('/api/track/visit', async (req, res) => {
       updatedAt: FieldValue.serverTimestamp()
     }, { merge: true });
     await dailyRef.update({
-      [`hourly.${hour}.visits`]: FieldValue.increment(1)
+      [`hourly.${hourFixed}.visits`]: FieldValue.increment(1)
     });
 
     await db.collection('hw-visit-logs').add({
@@ -1316,6 +1319,7 @@ app.post('/api/track/card', async (req, res) => {
 
     const today = new Date().toLocaleDateString('en-CA', { timeZone: 'Asia/Seoul' });
     const hour = new Date().toLocaleString('en-US', { timeZone: 'Asia/Seoul', hour: '2-digit', hour12: false }).padStart(2, '0');
+    const hourFixed = hour === '24' ? '00' : hour;
     const dailyRef = db.collection('hw-analytics').doc(today);
     await dailyRef.set({
       date: today,
@@ -1324,8 +1328,8 @@ app.post('/api/track/card', async (req, res) => {
     }, { merge: true });
     await dailyRef.update({
       [`cards.${type}`]: FieldValue.increment(1),
-      [`hourly.${hour}.cards`]: FieldValue.increment(1),
-      [`hourly.${hour}.cards_${type}`]: FieldValue.increment(1)
+      [`hourly.${hourFixed}.cards`]: FieldValue.increment(1),
+      [`hourly.${hourFixed}.cards_${type}`]: FieldValue.increment(1)
     });
 
     res.json({ success: true });
@@ -1408,10 +1412,15 @@ let totalGimyeongpae = 0;
     });
 
     // 2) 결제 완료 주문 통계
-    const ordersSnap = await db.collection('hw-orders')
-      .where('paymentStatus', '==', 'confirmed')
-      .orderBy('createdAt', 'desc')
-      .limit(500)
+    let ordersQuery = db.collection('hw-orders')
+      .where('paymentStatus', '==', 'confirmed');
+    // 기간 필터: 'all'이면 필터 없이 전체. 아니면 startDate 이후만.
+    if (period !== 'all') {
+      ordersQuery = ordersQuery.where('paidAt', '>=', startDate);
+    }
+    const ordersSnap = await ordersQuery
+      .orderBy('paidAt', 'desc')
+      .limit(10000)
       .get();
 
     let totalRevenue = 0;
