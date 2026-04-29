@@ -110,7 +110,10 @@ app.get('/test-firestore', async (req, res) => {
 
 
 // ── 알림톡 발송 공통 함수 ──
-async function sendAlimtalk(phone, templateId, variables, buttons = []) {
+async function sendAlimtalk(phone, templateId, variables, buttons = [], orderId = null) {
+  let success = false;
+  let errMsg = null;
+  let result = null;
   try {
     const msg = {
       to: phone.replace(/-/g, ''),
@@ -122,13 +125,28 @@ async function sendAlimtalk(phone, templateId, variables, buttons = []) {
         buttons: buttons
       }
     };
-    const result = await solapi.sendOne(msg);
+    result = await solapi.sendOne(msg);
     console.log('알림톡 발송 성공:', templateId, result);
-    return result;
+    success = true;
   } catch (e) {
     console.error('알림톡 발송 실패:', templateId, e.message);
-    return null;
+    errMsg = e.message;
   }
+  // DB 기록 (orderId 있을 때만)
+  if (orderId) {
+    try {
+      const update = {
+        alimtalkSent: success,
+        alimtalkSentAt: FieldValue.serverTimestamp(),
+        alimtalkTemplateIds: FieldValue.arrayUnion(templateId)
+      };
+      if (!success && errMsg) update.alimtalkError = errMsg;
+      await db.collection('hw-orders').doc(orderId).update(update);
+    } catch (dbErr) {
+      console.error('알림톡 DB 기록 실패:', orderId, dbErr.message);
+    }
+  }
+  return result;
 }
 
 app.post('/order', async (req, res) => {
@@ -250,7 +268,7 @@ app.post('/confirm', async (req, res) => {
       buttonName: '결과 확인하기',
       linkMo: `https://${resultURL}`,
       linkPc: `https://${resultURL}`
-    }]);
+    }], orderId);
 
     /* // ── 알림톡 4: 질문권 안내 (3시간 후) ──
     if (orderData.product === 'HW2' || orderData.product === 'HW3') {
@@ -578,7 +596,7 @@ app.post('/payment/confirm', async (req, res) => {
       buttonName: '결과 확인하기',
       linkMo: `https://${resultURL}`,
       linkPc: `https://${resultURL}`
-    }]);
+    }], orderId);
 
     /* // ── 알림톡 4: 질문권 안내 (3시간 후) ──
     if (orderData.product === 'HW2' || orderData.product === 'HW3') {
@@ -1141,7 +1159,7 @@ ${dateContext}
         '#{이름}': order.user.name || '',
         '#{주문번호}': orderId,
         '#{결과URL}': bpURL
-      }, [{ buttonType: 'WL', buttonName: '본풀이 결과 확인하기', linkMo: 'https://' + bpURL, linkPc: 'https://' + bpURL }]);
+      }, [{ buttonType: 'WL', buttonName: '본풀이 결과 확인하기', linkMo: 'https://' + bpURL, linkPc: 'https://' + bpURL }], orderId);
     } catch(alimErr) { console.error('bonpuri alimtalk error:', alimErr.message); }
 
     res.json({ success: true, result: resultData });
@@ -1211,7 +1229,7 @@ app.post('/admin/test-alimtalk', async (req, res) => {
       '#{결제일시}': new Date().toLocaleString('ko-KR', { timeZone: 'Asia/Seoul' }),
       '#{안내문구}': '이것은 알림톡 테스트입니다.',
       '#{결과URL}': 'readmelab.github.io/howangdang/'
-    }, [{ buttonType: 'WL', buttonName: '테스트 확인', linkMo: 'https://readmelab.github.io/howangdang/', linkPc: 'https://readmelab.github.io/howangdang/' }]);
+    }, [{ buttonType: 'WL', buttonName: '테스트 확인', linkMo: 'https://readmelab.github.io/howangdang/', linkPc: 'https://readmelab.github.io/howangdang/' }], orderId);
     res.json({ success: true });
   } catch (e) {
     res.json({ success: false, error: e.message });
