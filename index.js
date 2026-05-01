@@ -1782,22 +1782,6 @@ app.post('/api/v2/nusu-treat', async (req, res) => {
   }
 });
 
-// ============ [일회용] nusuCard 주입 (orderId=ORDMOLMU8FM5GM 복구용) ============
-app.post('/admin/inject-nusucard', async (req, res) => {
-  try {
-    const { orderId, nusuCard } = req.body;
-    if (!orderId || !nusuCard) return res.status(400).json({ success: false, error: 'orderId and nusuCard required' });
-    const ref = db.collection('hw-orders').doc(orderId);
-    const snap = await ref.get();
-    if (!snap.exists) return res.status(404).json({ success: false, error: 'order not found' });
-    await ref.update({ nusuCard: nusuCard, _nusuCardInjectedAt: admin.firestore.FieldValue.serverTimestamp() });
-    res.json({ success: true, orderId: orderId, leakKey: nusuCard.leakKey, leakLevel: nusuCard.leakLevel });
-  } catch (e) {
-    console.error('inject-nusucard error:', e);
-    res.status(500).json({ success: false, error: e.message });
-  }
-});
-
 // ============ 테스트 데이터 정리 API ============
 app.delete('/admin/cleanup-test', async (req, res) => {
   try {
