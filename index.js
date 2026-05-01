@@ -28,6 +28,7 @@ app.use(express.json());
 // ── 모듈화된 라우트 ──
 const jaemulRouter = require('./routes/jaemul');
 const jikupCardRouter = require('./routes/jikup');
+const { computeNusuCardFromOrder } = require('./engines/nusuCardEngine');
 const jikupTreatRouter = require('./routes/jikup-treat');
 app.use(jaemulRouter);
 app.use(jikupCardRouter);
@@ -1694,8 +1695,22 @@ app.post('/api/v2/nusu-treat', async (req, res) => {
     const order = orderDoc.data();
     if (order.product !== 'NUSU') return res.status(400).json({ success: false, error: 'not NUSU order, skip nusu-treat' });
 
-    const cardData = order.nusuCard;
-    if (!cardData) return res.status(400).json({ success: false, error: 'nusu card data not found' });
+    let cardData = order.nusuCard;
+    if (!cardData) {
+      // Fallback: nusuCard가 없으면 사주 API에서 자동 합성 (order.html 단독 결제 경로 대응)
+      console.warn('[nusu-treat] nusuCard missing, computing from saju API. orderId=' + orderId);
+      try {
+        cardData = await computeNusuCardFromOrder(order);
+        await db.collection('hw-orders').doc(orderId).update({
+          nusuCard: cardData,
+          _nusuCardBackfilledAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        console.log('[nusu-treat] nusuCard backfilled. orderId=' + orderId + ' leakKey=' + cardData.leakKey + ' leakLevel=' + cardData.leakLevel);
+      } catch (fbErr) {
+        console.error('[nusu-treat] fallback failed:', fbErr.message);
+        return res.status(500).json({ success: false, error: 'nusuCard fallback failed: ' + fbErr.message });
+      }
+    }
 
     const leakKey = cardData.leakKey;
     const leakLevel = cardData.leakLevel;

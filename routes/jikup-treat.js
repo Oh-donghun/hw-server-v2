@@ -10,6 +10,7 @@ const admin = require('firebase-admin');
 const router = express.Router();
 
 const D = require('../jikupCardData');
+const { computeJikupCardFromOrder } = require('../engines/jikupCardEngine');
 const T = require('../jikupTreatData');
 
 function getDb() { return admin.firestore(); }
@@ -342,9 +343,23 @@ router.post('/api/v2/jikup-treat', async (req, res) => {
       await resultRef.delete();
     }
 
-    // 무료 카드 데이터 필수
-    const cardData = order.jikupCard;
-    if (!cardData) return res.status(400).json({ success: false, error: 'jikupCard not found in order' });
+    // 무료 카드 데이터 (없으면 사주 API에서 자동 합성)
+    let cardData = order.jikupCard;
+    if (!cardData) {
+      // Fallback: jikupCard가 없으면 사주 API에서 자동 합성 (order.html 단독 결제 경로 대응)
+      console.warn('[jikup-treat] jikupCard missing, computing from saju API. orderId=' + orderId);
+      try {
+        cardData = await computeJikupCardFromOrder(order);
+        await getDb().collection('hw-orders').doc(orderId).update({
+          jikupCard: cardData,
+          _jikupCardBackfilledAt: admin.firestore.FieldValue.serverTimestamp()
+        });
+        console.log('[jikup-treat] jikupCard backfilled. orderId=' + orderId + ' jikupKey=' + (cardData.card && cardData.card.jikupKey) + ' score=' + (cardData.gunghap && cardData.gunghap.score));
+      } catch (fbErr) {
+        console.error('[jikup-treat] fallback failed:', fbErr.message);
+        return res.status(500).json({ success: false, error: 'jikupCard fallback failed: ' + fbErr.message });
+      }
+    }
 
     // 카드 데이터에서 꺼내기 (이미 무료 카드에서 분석 완료)
     const card = cardData.card || {};
